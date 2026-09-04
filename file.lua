@@ -1,4 +1,4 @@
--- OVERLORD UTILITY ENGINE v7.0: ULTRA-COMPACT FIXED
+-- OVERLORD UTILITY ENGINE v7.0: ULTRA-COMPACT FIXED (Updated: numeric inputs)
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "OverlordEngineUI_Native"
 
@@ -14,8 +14,8 @@ else
 end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 400)
-MainFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 320, 0, 460)
+MainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
@@ -52,7 +52,7 @@ local Container = Instance.new("ScrollingFrame", MainFrame)
 Container.Size = UDim2.new(1, -16, 1, -45)
 Container.Position = UDim2.new(0, 8, 0, 40)
 Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 0, 550)
+Container.CanvasSize = UDim2.new(0, 0, 0, 800)
 Container.ScrollBarThickness = 4
 Container.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 150)
 
@@ -95,6 +95,61 @@ local function CreateMenuToggle(text, default, callback)
     return Tgl
 end
 
+-- Create a numeric input row: label, textbox, set button
+local function CreateMenuNumberInput(text, default, callback)
+    local frame = Instance.new("Frame", Container)
+    frame.Size = UDim2.new(1, 0, 0, 36)
+    frame.BackgroundTransparency = 1
+
+    local label = Instance.new("TextLabel", frame)
+    label.Size = UDim2.new(0.55, 0, 1, 0)
+    label.Position = UDim2.new(0, 6, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Font = Enum.Font.SourceSansSemibold
+    label.TextSize = 14
+    label.TextColor3 = Color3.fromRGB(240,240,240)
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0.25, 0, 0.72, 0)
+    box.Position = UDim2.new(0.6, 0, 0.14, 0)
+    box.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    box.TextColor3 = Color3.fromRGB(240,240,240)
+    box.Text = tostring(default)
+    box.ClearTextOnFocus = false
+    box.Font = Enum.Font.SourceSans
+    box.TextSize = 14
+    local corner = Instance.new("UICorner", box)
+    corner.CornerRadius = UDim.new(0, 4)
+
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(0.12, 0, 0.72, 0)
+    btn.Position = UDim2.new(0.86, 0, 0.14, 0)
+    btn.Text = "Set"
+    btn.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    btn.TextColor3 = Color3.fromRGB(240,240,240)
+    btn.Font = Enum.Font.SourceSansSemibold
+    btn.TextSize = 14
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseButton1Click:Connect(function()
+        local val = tonumber(box.Text)
+        if val then
+            pcall(function() callback(val) end)
+            box.Text = tostring(val)
+        else
+            -- invalid input: flash
+            local old = box.Text
+            box.Text = "NaN"
+            task.wait(0.6)
+            box.Text = old
+        end
+    end)
+
+    return frame, box, btn
+end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -103,9 +158,18 @@ local Camera = workspace.CurrentCamera
 local Mouse = LocalPlayer and LocalPlayer:GetMouse()
 
 local Settings = {
-    WalkSpeed = 16, JumpPower = 50, InfJump = false, Noclip = false,
-    HitboxExt = false, HitboxSize = 25, Aimbot = false, AimFOV = 150,
-    Fly = false, FlySpeed = 50, LagSwitch = false, ChatSpam = false
+    WalkSpeed = 16,
+    JumpPower = 50,
+    InfJump = false,
+    Noclip = false,
+    HitboxExt = false,
+    HitboxSize = 25,
+    Aimbot = false,
+    AimFOV = 150,
+    Fly = false,
+    FlySpeed = 50,
+    LagSwitch = false,
+    ChatSpam = false
 }
 
 local function getChar() return (LocalPlayer and (LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())) end
@@ -118,6 +182,21 @@ local function getRoot()
     local char = getChar()
     if char then return char:FindFirstChild("HumanoidRootPart") end
     return nil
+end
+
+-- Keep WalkSpeed and JumpPower applied when character spawns
+if LocalPlayer then
+    LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        local hum = getHum()
+        if hum then
+            pcall(function()
+                hum.WalkSpeed = Settings.WalkSpeed
+                if hum.UseJumpPower ~= nil then hum.UseJumpPower = true end
+                hum.JumpPower = Settings.JumpPower
+            end)
+        end
+    end)
 end
 
 RunService.Stepped:Connect(function()
@@ -136,6 +215,7 @@ UserInputService.JumpRequest:Connect(function()
     end
 end)
 
+-- Flight implementation
 task.spawn(function()
     while task.wait(0.1) do
         if Settings.Fly and getRoot() then
@@ -146,13 +226,13 @@ task.spawn(function()
                 bv.MaxForce = Vector3.new(1,1,1) * 9e9
                 bv.Velocity = Vector3.new(0,0,0)
                 bv.Parent = root
-                
+
                 local bg = Instance.new("BodyGyro")
                 bg.Name = "EngineFlyGyro"
                 bg.MaxTorque = Vector3.new(1,1,1) * 9e9
                 bg.CFrame = root.CFrame
                 bg.Parent = root
-                
+
                 task.spawn(function()
                     while root and root:FindFirstChild("EngineFlyVel") and Settings.Fly do
                         RunService.RenderStepped:Wait()
@@ -174,6 +254,7 @@ task.spawn(function()
     end
 end)
 
+-- Hitbox expansion
 task.spawn(function()
     while task.wait(1) do
         for _, p in pairs(Players:GetPlayers()) do
@@ -197,12 +278,13 @@ task.spawn(function()
     end
 end)
 
+-- Aimbot
 RunService.RenderStepped:Connect(function()
     if Settings.Aimbot then
         local target = nil
         local shortestDist = Settings.AimFOV
         local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        
+
         for _, p in pairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
@@ -224,41 +306,56 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Buttons and Toggles
-CreateMenuButton("Set Speed: 150", function()
-    Settings.WalkSpeed = 150
-    local hum = getHum()
-    if hum then hum.WalkSpeed = 150 end
-end)
-
-CreateMenuButton("Set Jump Power: 200", function()
-    Settings.JumpPower = 200
+-- UI Controls: inputs for numeric customization
+local speedFrame = CreateMenuNumberInput("Walk Speed", Settings.WalkSpeed, function(v)
+    Settings.WalkSpeed = v
     local hum = getHum()
     if hum then
-        if hum.UseJumpPower ~= nil then hum.UseJumpPower = true end
-        hum.JumpPower = 200
+        pcall(function() hum.WalkSpeed = Settings.WalkSpeed end)
     end
 end)
 
-CreateMenuButton("Reset Stats to Default", function()
-    Settings.WalkSpeed = 16
-    Settings.JumpPower = 50
+local jumpFrame = CreateMenuNumberInput("Jump Power", Settings.JumpPower, function(v)
+    Settings.JumpPower = v
     local hum = getHum()
     if hum then
-        hum.WalkSpeed = 16
-        hum.JumpPower = 50
+        pcall(function() if hum.UseJumpPower ~= nil then hum.UseJumpPower = true end hum.JumpPower = Settings.JumpPower end)
     end
 end)
 
-CreateMenuToggle("Infinite Jump Engine", false, function(v)
+local flyFrame = CreateMenuNumberInput("Fly Speed", Settings.FlySpeed, function(v)
+    Settings.FlySpeed = v
+end)
+
+local hitboxFrame = CreateMenuNumberInput("Hitbox Size", Settings.HitboxSize, function(v)
+    Settings.HitboxSize = v
+end)
+
+local aimFrame = CreateMenuNumberInput("Aim FOV (px)", Settings.AimFOV, function(v)
+    Settings.AimFOV = v
+end)
+
+-- Convenience buttons to apply current settings immediately
+CreateMenuButton("Apply WalkSpeed/Jumppower to Character", function()
+    local hum = getHum()
+    if hum then
+        pcall(function()
+            hum.WalkSpeed = Settings.WalkSpeed
+            if hum.UseJumpPower ~= nil then hum.UseJumpPower = true end
+            hum.JumpPower = Settings.JumpPower
+        end)
+    end
+end)
+
+CreateMenuToggle("Infinite Jump Engine", Settings.InfJump, function(v)
     Settings.InfJump = v
 end)
 
-CreateMenuToggle("Phase Mode (Noclip)", false, function(v)
+CreateMenuToggle("Phase Mode (Noclip)", Settings.Noclip, function(v)
     Settings.Noclip = v
 end)
 
-CreateMenuToggle("Flight Mechanics (W,A,S,D)", false, function(v)
+CreateMenuToggle("Flight Mechanics (W,A,S,D)", Settings.Fly, function(v)
     Settings.Fly = v
     if not v and getRoot() then
         local root = getRoot()
@@ -267,18 +364,24 @@ CreateMenuToggle("Flight Mechanics (W,A,S,D)", false, function(v)
     end
 end)
 
-CreateMenuToggle("Expand Enemy Hitboxes", false, function(v)
+CreateMenuToggle("Expand Enemy Hitboxes", Settings.HitboxExt, function(v)
     Settings.HitboxExt = v
 end)
 
-CreateMenuToggle("Aim Lock Tracking Assist", false, function(v)
+CreateMenuToggle("Aim Lock Tracking Assist", Settings.Aimbot, function(v)
     Settings.Aimbot = v
 end)
 
-CreateMenuButton("Teleport: CTRL + Left Click", function()
+CreateMenuButton("Teleport: CTRL + Left Click (toggle listener)", function()
     if not Mouse then return end
-    local connection
-    connection = Mouse.Button1Down:Connect(function()
+    -- toggle listener: if active, disconnect; if not, connect
+    if _G.OverlordTeleportConnection and type(_G.OverlordTeleportConnection.Disconnect) == "function" then
+        _G.OverlordTeleportConnection:Disconnect()
+        _G.OverlordTeleportConnection = nil
+        -- feedback: change title of last created button? We'll just return
+        return
+    end
+    _G.OverlordTeleportConnection = Mouse.Button1Down:Connect(function()
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and Mouse.Target then
             local root = getRoot()
             if root and Mouse.Hit then
@@ -286,10 +389,9 @@ CreateMenuButton("Teleport: CTRL + Left Click", function()
             end
         end
     end)
-    -- optional: disconnect after a while or keep it persistent (kept persistent here)
 end)
 
-CreateMenuToggle("Network Lag Switch", false, function(v)
+CreateMenuToggle("Network Lag Switch", Settings.LagSwitch, function(v)
     Settings.LagSwitch = v
 end)
 
