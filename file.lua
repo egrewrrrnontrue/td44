@@ -14,7 +14,7 @@ else
 end
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 460)
+MainFrame.Size = UDim2.new(0, 320, 0, 600)
 MainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
 MainFrame.BorderSizePixel = 0
@@ -52,7 +52,7 @@ local Container = Instance.new("ScrollingFrame", MainFrame)
 Container.Size = UDim2.new(1, -16, 1, -45)
 Container.Position = UDim2.new(0, 8, 0, 40)
 Container.BackgroundTransparency = 1
-Container.CanvasSize = UDim2.new(0, 0, 0, 800)
+Container.CanvasSize = UDim2.new(0, 0, 0, 1200)
 Container.ScrollBarThickness = 4
 Container.ScrollBarImageColor3 = Color3.fromRGB(0, 255, 150)
 
@@ -169,7 +169,18 @@ local Settings = {
     Fly = false,
     FlySpeed = 50,
     LagSwitch = false,
-    ChatSpam = false
+    ChatSpam = false,
+    GodMode = false,
+    SpeedHack = false,
+    SpeedMult = 2,
+    InvisMode = false,
+    AutoFarm = false,
+    ESPEnabled = false,
+    WallHack = false,
+    InstantToolGrab = false,
+    VehicleSpeed = 100,
+    InfiniteStamina = false,
+    AutoDodge = false
 }
 
 local function getChar() return (LocalPlayer and (LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait())) end
@@ -306,6 +317,95 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- God Mode: prevent damage
+task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.GodMode then
+            local hum = getHum()
+            if hum then
+                hum.Health = hum.MaxHealth
+            end
+        end
+    end
+end)
+
+-- Speed Hack: multiply movement
+task.spawn(function()
+    while task.wait(0.05) do
+        if Settings.SpeedHack and getRoot() then
+            local root = getRoot()
+            if root then
+                root.Velocity = root.Velocity * Vector3.new(Settings.SpeedMult, 1, Settings.SpeedMult)
+            end
+        end
+    end
+end)
+
+-- Invisibility Mode
+task.spawn(function()
+    while task.wait(0.5) do
+        if Settings.InvisMode and getChar() then
+            for _, part in pairs(getChar():GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = 1
+                end
+            end
+        end
+    end
+end)
+
+-- Auto Dodge - jump away from nearby enemies
+task.spawn(function()
+    while task.wait(0.2) do
+        if Settings.AutoDodge and getRoot() then
+            local root = getRoot()
+            local hum = getHum()
+            if root and hum then
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local enemyRoot = p.Character.HumanoidRootPart
+                        if (enemyRoot.Position - root.Position).Magnitude < 20 then
+                            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                            root.Velocity = root.Velocity + (root.Position - enemyRoot.Position).Unit * 50
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ESP: Draw lines to enemies
+local espAdornments = {}
+task.spawn(function()
+    while task.wait(0.5) do
+        -- Clear old ESP
+        for _, adorn in pairs(espAdornments) do
+            pcall(function() adorn:Destroy() end)
+        end
+        espAdornments = {}
+        
+        if Settings.ESPEnabled and getRoot() then
+            local root = getRoot()
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local enemyRoot = p.Character.HumanoidRootPart
+                    local line = Instance.new("Part")
+                    line.Name = "ESPLine"
+                    line.Shape = Enum.PartType.Cylinder
+                    line.CanCollide = false
+                    line.CFrame = CFrame.new((root.Position + enemyRoot.Position) / 2, root.Position)
+                    line.Size = Vector3.new(0.2, (root.Position - enemyRoot.Position).Magnitude, 0.2)
+                    line.Color = Color3.fromRGB(0, 255, 0)
+                    line.Transparency = 0.5
+                    line.Parent = workspace
+                    table.insert(espAdornments, line)
+                end
+            end
+        end
+    end
+end)
+
 -- UI Controls: inputs for numeric customization
 local speedFrame = CreateMenuNumberInput("Walk Speed", Settings.WalkSpeed, function(v)
     Settings.WalkSpeed = v
@@ -333,6 +433,14 @@ end)
 
 local aimFrame = CreateMenuNumberInput("Aim FOV (px)", Settings.AimFOV, function(v)
     Settings.AimFOV = v
+end)
+
+local speedMultFrame = CreateMenuNumberInput("Speed Multiplier", Settings.SpeedMult, function(v)
+    Settings.SpeedMult = v
+end)
+
+local vehicleSpeedFrame = CreateMenuNumberInput("Vehicle Speed", Settings.VehicleSpeed, function(v)
+    Settings.VehicleSpeed = v
 end)
 
 -- Convenience buttons to apply current settings immediately
@@ -370,6 +478,33 @@ end)
 
 CreateMenuToggle("Aim Lock Tracking Assist", Settings.Aimbot, function(v)
     Settings.Aimbot = v
+end)
+
+CreateMenuToggle("God Mode (Invincible)", Settings.GodMode, function(v)
+    Settings.GodMode = v
+end)
+
+CreateMenuToggle("Speed Hack (Movement Boost)", Settings.SpeedHack, function(v)
+    Settings.SpeedHack = v
+end)
+
+CreateMenuToggle("Invisibility Mode", Settings.InvisMode, function(v)
+    Settings.InvisMode = v
+    if not v and getChar() then
+        for _, part in pairs(getChar():GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.Transparency = 0
+            end
+        end
+    end
+end)
+
+CreateMenuToggle("Auto Dodge (Combat)", Settings.AutoDodge, function(v)
+    Settings.AutoDodge = v
+end)
+
+CreateMenuToggle("ESP (Enemy Tracking)", Settings.ESPEnabled, function(v)
+    Settings.ESPEnabled = v
 end)
 
 CreateMenuButton("Teleport: CTRL + Left Click (toggle listener)", function()
@@ -421,11 +556,81 @@ CreateMenuButton("Optimize Client Frames (FPS Boost)", function()
     end
 end)
 
+-- Remove All Obstacles
+CreateMenuButton("Remove All Obstacles", function()
+    for _, part in pairs(workspace:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "Baseplate" and not part:IsDescendantOf(LocalPlayer.Character or Instance.new("Model")) then
+            pcall(function() part:Destroy() end)
+        end
+    end
+end)
+
 -- Simulate Fake Error 277 Kick
 CreateMenuButton("Simulate Fake Error 277 Kick", function()
     pcall(function()
         game:GetService("GuiService"):SetErrorMessage("An unexpected error occurred and you have been disconnected. (Error Code: 277)")
     end)
+end)
+
+-- Teleport All Players to Me
+CreateMenuButton("Teleport All Players to Me", function()
+    local root = getRoot()
+    if root then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character.HumanoidRootPart.CFrame = root.CFrame + Vector3.new(math.random(-10, 10), 0, math.random(-10, 10))
+            end
+        end
+    end
+end)
+
+-- Freeze All Players
+CreateMenuButton("Freeze All Players", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            p.Character.HumanoidRootPart.Anchored = true
+        end
+    end
+end)
+
+-- Unfreeze All Players
+CreateMenuButton("Unfreeze All Players", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+            p.Character.HumanoidRootPart.Anchored = false
+        end
+    end
+end)
+
+-- Kill All Players
+CreateMenuButton("Kill All Players", function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.Health = 0
+            end
+        end
+    end
+end)
+
+-- Massive Jump Power
+CreateMenuButton("Massive Jump (9999)", function()
+    local hum = getHum()
+    if hum then
+        pcall(function()
+            if hum.UseJumpPower ~= nil then hum.UseJumpPower = true end
+            hum.JumpPower = 9999
+        end)
+    end
+end)
+
+-- Super Speed Walk
+CreateMenuButton("Super Speed Walk (300)", function()
+    local hum = getHum()
+    if hum then
+        pcall(function() hum.WalkSpeed = 300 end)
+    end
 end)
 
 -- Permanent Anti-AFK Routine
